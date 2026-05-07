@@ -1,0 +1,497 @@
+---
+title: "Student Performance Dashboard "
+format:
+  
+  dashboard:
+    backgroundcolor: "#CCCCFF"
+    theme: cosmo
+    orientation: rows
+editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+
+library(tidyverse)
+library(readxl)
+library(scales)
+library(DT)
+library(gt)
+```
+
+```{r}
+#| label: load-datase
+#| message: false
+
+# importing the dataset and getting all the variables from the dataset
+student_data_all_variables <- read.csv("student-mat.csv", sep = ";", check.names = FALSE)
+
+# creating specific variable set so I can work on specific variables
+student_data <- student_data_all_variables
+```
+
+```{r}
+#| label: prep-data
+
+# selecting only the variables I want to use in the dashboard
+student_data <- student_data |>
+  select(
+    travel_time = traveltime,
+    weekly_study_time = studytime,
+    family_support = famsup,
+    activities,
+    higher_education_interest = higher,
+    internet_access = internet,
+    family_relationships = famrel,
+    free_time = freetime,
+    health,
+    absences,
+    first_semester_grade = G1,
+    second_semester_grade = G2,
+    final_grade = G3
+    ) |>
+  
+# cleaning and renaming variables
+  mutate(
+    family_support = str_to_sentence(family_support),
+    activities = str_to_sentence(activities),
+    higher_education_interest = str_to_sentence(higher_education_interest),
+    internet_access = str_to_sentence(internet_access),
+  
+    # changing the travel time values into more specific catergories   
+    travel_time = case_when(
+      travel_time == 1 ~ "<15 minutes",
+      travel_time == 2 ~ "15 to 30 minutes",
+      travel_time == 3 ~ "30 minutes to 1 hour",
+      travel_time == 4 ~ ">1 hour"
+      ),
+    
+     # changing the weekly study time values into more specific catergories 
+    weekly_study_time = case_when(
+      weekly_study_time == 1 ~ "<2 hours",
+      weekly_study_time == 2 ~ "2 to 5 hours",
+      weekly_study_time == 3 ~ "5 to 10 hours",
+      weekly_study_time == 4 ~ ">10 hours"
+      ),
+   
+    # sorting the study time categories from least to greatest 
+    weekly_study_time = factor(
+      weekly_study_time,
+      levels = c(
+        "<2 hours",
+        "2 to 5 hours",
+        "5 to 10 hours",
+        ">10 hours"
+        )
+      ),
+    
+    # sorting the travel time categories from least to greatest 
+    travel_time = factor(
+      travel_time,
+      levels = c(
+        "<15 minutes",
+        "15 to 30 minutes",
+        "30 minutes to 1 hour",
+        ">1 hour"
+        )
+      )
+    )
+```
+
+#  {.sidebar}
+
+This dashboard displays summary statistics for students' performance in a math course from two Portuguese schools. The data was collected from school reports and questionnaires. This project explores how students' math final grades change based on many different variables.
+
+The variables I chose to look at in the dataset are:
+
+-   **Travel Time**: how long it takes a student to travel from home to school
+
+-   **Weekly Study Time**: how much time a student studies each week
+
+-   **Activities**: whether a student participates in extracurricular activities
+
+-   **Higher Education Interest**: whether a student has interest in pursuing higher education
+
+-   **Internet Access**: whether a student has internet access at home
+
+-   **Family Relationships**: the quality of a student's family relationships, going from 1 which is very low to 5 which is very high
+
+-   **Free Time:** how much a student has free time after school, going from 1 which is very low to 5 which is very high
+
+-   **Health**: a student's current health status, going from 1 which is very low to 5 which is very high
+
+-   **Absences**: the number of school absences a student has
+
+-   **First Semester Grade**: the student's first grade score in the course, ranging from 0 to 20
+
+-   **Second Semester Grade**: the student's second grade score in the course, ranging from 0 to 20
+
+-   **Final Grade**: the student's final grade in the course, ranging from 0 to 20
+
+In this dashboard, the Overview page summarizes the dataset and shows the average first semester, second semester, and final grades. The Academic Factors, Personal Factors, and Outside Factor pages compare final grades towards different variables related to student performance and overall well being. The Conclusion page summarizes the findings from the dataset and the Data page shows the full dataset.
+
+# OVERVIEW
+
+```{r}
+#| label: overview-values
+#| results: hide
+
+# calculating the average grades for each grading period
+average_first_semester_grade <- student_data |>
+  summarize(score = mean(first_semester_grade, na.rm = TRUE)) |>
+  pull(score)
+
+average_second_semester_grade <- student_data |>
+  summarize(score = mean(second_semester_grade, na.rm = TRUE)) |>
+  pull(score)
+
+average_final_grade <- student_data |>
+  summarize(score = mean(final_grade, na.rm = TRUE)) |>
+  pull(score)
+
+```
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Average First Semester Grade (Out of 20)"
+
+# showing average first semester grade within a value box
+list(
+  icon = "1-circle-fill",
+  color = "#CC3333",
+  value = round(average_first_semester_grade, 1)
+  )
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Second Semester Grade (Out of 20)"
+
+# showing average second semester grade within a value box
+list(
+  icon = "2-circle-fill",
+  color = "#3366CC",
+  value = round(average_second_semester_grade, 1)
+  )
+
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Final Semester Grade (Out of 20)"
+
+# showing average final grade within a value box
+list(
+  icon = "check",
+  color = "#66CC66",
+  value = round(average_final_grade, 1)
+)
+```
+
+## Row {height="40%"}
+
+### Column {width="50%"}
+
+```{r}
+#| title: Average Grades Over Time
+
+# creating bar chart that shows average grades across grading periods
+
+grade_period <- c("First Semester","Second Semester","Final Grade")
+
+average_grade <- c(average_first_semester_grade, average_second_semester_grade, average_final_grade)
+
+ggplot() + 
+  geom_col(aes(x = grade_period, y = average_grade),
+           fill = c ("#CC3333", "#3366CC", "#66CC66")) +
+  labs(
+    x = "Grade Period",
+    y = "Average Grade",
+    title = "Average Student Grades Over Time"
+    )
+```
+
+### Column {width="50%"}
+
+```{r}
+#| title: Summary Statistics for Student Grades
+
+# creating summary table that displays the average, lowest, and highest grades
+student_data |>
+  summarize(
+    Grade = c("First Semester","Second Semester","Final Grade"),
+    
+    Average = c(
+       mean(first_semester_grade, na.rm = TRUE),
+       mean(second_semester_grade, na.rm = TRUE),
+       mean(final_grade, na.rm = TRUE) 
+       ),
+
+    Lowest = c(
+      min(first_semester_grade, na.rm = TRUE), 
+      min(second_semester_grade, na.rm = TRUE), 
+      min(final_grade, na.rm = TRUE)
+      ),
+    
+    Highest = c(
+      max(first_semester_grade, na.rm = TRUE),
+      max(second_semester_grade, na.rm = TRUE),
+      max(final_grade, na.rm = TRUE)
+      ),
+    ) |>
+  gt()
+
+
+```
+
+# ACADEMIC FACTORS
+
+This section explores variables that students might have some control over that connect to school habits, academic choices, and goals.
+
+## Row {height="40%"}
+
+### Column {width="50%"}
+
+```{r}
+#| title: Average Final Grade Compared to Weekly Study Time
+
+# calculating the average final grade for each weekly study time and then creating a bar chart comparing study time and average final grades
+
+student_data |>
+  group_by(weekly_study_time) |>
+  summarize(average_grade = mean(final_grade, na.rm = TRUE)) |>
+  ggplot(aes(x = weekly_study_time, y = average_grade)) +
+  geom_col() +
+  labs(
+    x = "Weekly Study Time (Hours)",
+    y = "Average Final Grade (Out of 20)"
+  )
+```
+
+### Column {width="50%"}
+
+```{r}
+#| title: Final Grade Compared to Participation in Extracurricular Activities
+
+# creating a boxplot that is comparing finals grades and extracurricular participation
+
+student_data |>
+  ggplot(aes(x = activities, y = final_grade)) +
+  geom_boxplot() +
+  labs(
+    x = "Participation in Extracurricular Activities",
+    y = "Final Grade (Out of 20)"
+  )
+
+```
+
+```{r}
+#| title: Average Final Grade Compared to Higher Education Interest
+
+# calculating the average final grade based on interest in higher education than creating a bar chart that compares higher education interest and final grades
+
+student_data |>
+  group_by(higher_education_interest) |>
+  summarize(average_grade = mean(final_grade, na.rm = TRUE)) |>
+  ggplot(aes(x = higher_education_interest, y = average_grade)) +
+  geom_col() +
+  labs(
+    x = "Higher Education Interest",
+    y = "Average Final Grade (Out of 20)"
+    )
+```
+
+# PERSONAL FACTORS
+
+This section explores variables that are related to a student's personal life and wellness.
+
+## Row {height="40%"}
+
+### Column {width="50%"}
+
+```{r}
+#| title: Final Grade Compared to Health Level
+
+# creating a boxplot that compares health level and final grades
+
+student_data |>
+  ggplot(aes(x = factor(health), y = final_grade)) +
+  geom_boxplot() +
+  labs(
+    x = "Health Level",
+    y = "Final Grade (Out of 20)"
+    )
+```
+
+### Column {width="50%"}
+
+```{r}
+#| title: Average Final Grade Compared to Family Relationship Level
+
+# calculating the average final grade for each family relationship level and then creating a bar chart that compares family relationships and final grades
+
+student_data |>
+  group_by(family_relationships) |>
+  summarize(average_grade = mean(final_grade, na.rm = TRUE)) |>
+  ggplot(aes(x = family_relationships, y = average_grade)) +
+  geom_col() +
+  labs(
+    x = "Family Relationship Level",
+    y = "Average Final Grade (Out of 20)"
+    )
+```
+
+```{r}
+#| title: Average Final Grade Compared to Free Time Level
+
+# calculating the average final grade for each free time level and then creating a bar chart that compares free time level and final grades
+
+student_data |>
+  group_by(free_time) |>
+  summarize(average_grade = mean(final_grade, na.rm = TRUE)) |>
+  ggplot(aes(x = free_time, y = average_grade)) +
+  geom_col() +
+  labs(
+    x = "Free Time Level",
+    y = "Average Final Grade (Out of 20)"
+    )
+
+```
+
+# OUTSIDE FACTORS
+
+This section explores variables that students may have less control over.
+
+## Row {height="40%"}
+
+### Column {width="50%"}
+
+```{r}
+#| title: Number of Absences Compared to Final Grade
+
+# creating a scatterplot that compares the number of absences and final grades
+
+student_data |>
+  ggplot(aes(x = absences, y = final_grade)) + 
+  geom_point() +
+  labs(
+    x = "Number of Absences",
+    y = "Final Grade (Out of 20)"
+    )
+```
+
+### Column {width="50%"}
+
+```{r}
+#| title: Level of Travel Time Compared to Final Grade
+
+# creating a boxplot that compares travel time and final grades
+
+student_data |>
+  ggplot(aes(x = travel_time, y = final_grade)) + 
+  geom_boxplot() + 
+  labs(
+    x = "Travel Time",
+    y = "Final Grade (Out of 20)"
+  )
+```
+
+```{r}
+#| title: Average Final Grade Compared to Internet Access at Home
+
+# calculating the average grade based on internet access at home and then creating a bar chart that compares internet access and final grades
+
+student_data |>
+  group_by(internet_access) |>
+  summarise(average_grade = mean(final_grade, na.rm = TRUE)) |>
+  ggplot(aes(x = internet_access, y = average_grade)) +
+  geom_col() +
+  labs(
+    x = "Internet Access",
+    y = "Average Final Grade (Out of 20)"
+  )
+
+```
+
+# CONCLUSION
+
+**Summarizing my Findings**
+
+For this project, I was mainly interested in how specific variables, such as weekly study time, internet access, travel time to school, family relationships, and more influence a student's performance on their math test scores as I plan to become a future math teacher.
+
+I first found that the weekly study time of 5 to 10 hours resulted in the highest average final grade. I found this quite interesting as it had a higher average than over 10 hours of studying. Students who participated in extracurricular activities had a higher final grade compared to students who did not participate. There was a drastic difference in the average final grade compared to a student's interest in higher education, where students who said they had an interest had a greater average final grade.
+
+One thing I found quite weird was the students who had the lowest reported health level performed usually greater on the final grade score. I did not really see a student's family relationship or free time level affecting the average final grade score that much. However, the travel time to school had a big impact on the final grade score as the farther away a student was, the lower the final grade was. Internet access did result in a higher average final grade and the smaller number of absences results in usually a higher final grade.
+
+This project can overall help me better understand these patterns and aid me in becoming a more effective future math teacher by showing that student performance may be influenced by outside factors that students might or might not have control over. This puts emphasis on that students may enter a classroom with different experiences and levels of background and support. Knowing this can help me plan lessons that can provide clear instruction and multiple ways for students to learn so all students can have the opportunity to succeed no matter what their background is. It also shows the importance of encouraging students helpful study habits and overall creating a classroom environment where every student is capable of succeeding.
+
+**Additional Resources**
+
+For my project, I used the dataset from the website [UC Irvine](https://archive.ics.uci.edu/dataset/320/student+performance). Relevant additional resources that can be used to continue exploring topics related to the dataset I used are:
+
+-   [Test Scores, Class Rank and College Performance: Lessons for Broadening Access and Promoting Success](https://pmc.ncbi.nlm.nih.gov/articles/PMC3685191/)
+
+-   [Race and Ethnic Differences in College Achievement: Does High School Attended Matter?](https://pmc.ncbi.nlm.nih.gov/articles/PMC3489015/)
+
+-   [Student Exam Scores and Study Habits Dataset](https://www.kaggle.com/datasets/robiulhasanjisan/student-exam-scores-and-study-habits-dataset)
+
+The first link listed above provides additional resources that can help one better understand how specific factors of a student in high school influence their performance in college. It also provides a lot of data and graphs that show students' academic performance compared to their test scores as well as their high school rank compared to their economic status.
+
+The second link above provides additional resources that show a person's race compared to their first semester grade point average for four Texas Public Universities. Within the dataset I chose for this project, it did not include a variable for race/ethnicity so I was unable to provide visuals to help one better understand someone's race/ethnicity compared to their average math score. Therefore, I think the second link can provide helpful data to analyze when wanting to see someone's race, class rank, and test score compared to their first semester grade point average in college.
+
+Lastly, the third link provided above, is a dataset I found on Kaggle that shows how factors such as hours studied, class attendance, access to learning materials, extracurricular activities, sleep hours, previous exam scores, motivation level, internet access, and tutoring sessions influence their final exam score. I overall found this dataset to be very helpful if one wants to see how additional variables influence a student's performance on their final exam score.
+
+# DATA
+
+```{r}
+
+student_data_all_variables |> 
+  datatable(
+    colnames = c(
+    "School",
+      "Sex",
+      "Age",
+      "Address",
+      "Family Size",
+      "Parent Status",
+      "Mother Education",
+      "Father Education",
+      "Mother Job",
+      "Father Job",
+      "Reason",
+      "Guardian",
+      "Travel Time",
+      "Weekly Study Time",
+      "Failures",
+      "School Support",
+      "Family Support",
+      "Paid Classes",
+      "Activities",
+      "Nursery",
+      "Higher Education Interest",
+      "Internet Access",
+      "Romantic Relationship",
+      "Family Relationships",
+      "Free Time",
+      "Going Out",
+      "Workday Alcohol Consumption",
+      "Weekend Alcohol Consumption",
+      "Health",
+      "Absences",
+      "First Semester Grade",
+      "Second Semester Grade",
+      "Final Grade"
+    ),
+    options = list(
+      dom = "ltrip",
+      paging = TRUE,
+      lengthMenu = c(5, 10, 25),
+      pageLength = 10,
+      scrollX = TRUE 
+    )
+  )
+```
